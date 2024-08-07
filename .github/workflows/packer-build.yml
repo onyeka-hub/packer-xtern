@@ -11,19 +11,51 @@ on:
       - main
       - feature/*
 
-# AWS credentials and other sensitive information are securely stored using Github Secrets
 env:
-    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: 'us-east-1' # Set your default AWS region
 
 jobs:
-# workflows for feature-branch
   build-and-test:
     runs-on: ubuntu-latest
+
+    outputs:
+      ami_id: ${{ steps.extract-ami-id.outputs.AMI_ID }}
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Check and Install/Update AWS CLI
+      run: |
+        if command -v aws &> /dev/null; then
+          echo "AWS CLI is already installed."
+          CURRENT_VERSION=$(aws --version 2>&1 | cut -d/ -f2 | cut -d' ' -f1)
+          LATEST_VERSION=$(curl -s https://api.github.com/repos/aws/aws-cli/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+          if [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
+            echo "Updating AWS CLI from version $CURRENT_VERSION to $LATEST_VERSION."
+            sudo apt-get update
+            sudo apt-get install -y unzip
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            sudo ./aws/install --update
+          else
+            echo "AWS CLI is up to date (version $CURRENT_VERSION)."
+          fi
+        else
+          echo "AWS CLI is not installed. Installing now."
+          sudo apt-get update
+          sudo apt-get install -y unzip
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install
+        fi
+
+    - name: Configure AWS CLI
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_DEFAULT_REGION }}
 
     - name: Set up Node.js
       uses: actions/setup-node@v4
@@ -36,17 +68,73 @@ jobs:
         packer validate aws-ubuntu.pkr.hcl
 
     - name: Build AMI
-      id: test-ami
-      if: github.ref != 'refs/heads/main'
+      id: build-ami
       run: |
-        packer build -var 'ami_tag=testing-onyeka' aws-ubuntu.pkr.hcl
-   
-    - name: Deploy to testing environment
-      id: deploy
-      if: github.ref != 'refs/heads/main'
+        LOG_FILE="packer_build.log"
+        if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          packer build -var 'ami_tag=production-onyeka' aws-ubuntu.pkr.hcl | tee $LOG_FILE
+        else
+          packer build -var 'ami_tag=testing-onyeka' aws-ubuntu.pkr.hcl | tee $LOG_FILE
+        fi
+
+    - name: Upload Packer Build Logs
+      uses: actions/upload-artifact@v3
+      with:
+        name: packer-build-logs
+        path: packer_build.log
+
+    - name: Extract AMI ID
+      id: extract-ami-id
       run: |
-        # Your deployment script or commands here
-        echo "Deploying to testing environment"
+        AMI_TAG="production-onyeka"
+        if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
+          AMI_TAG="testing-onyeka"
+        fi
+        AMI_ID=$(aws ec2 describe-images --filters "Name=tag:Name,Values=$AMI_TAG" --query "Images[*].[ImageId,CreationDate]" --output text | sort -k2 | tail -n1 | awk '{print $1}')
+        
+        if [ -z "$AMI_ID" ]; then
+         echo "AMI does not exist. Aborting deployment."
+         exit 1
+        else
+          echo "AMI ID: $AMI_ID"
+        fi
+        echo "AMI_ID=$AMI_ID" >> $GITHUB_ENV
+        echo "::set-output name=AMI_ID::$AMI_ID"
+
+  deploy-to-testing:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref != 'refs/heads/main'
+
+    steps:
+    - name: Configure AWS CLI
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+    - name: Verify AMI Existence
+      run: |
+        AMI_ID=${{ needs.build-and-test.outputs.ami_id }}
+        if aws ec2 describe-images --image-ids $AMI_ID &> /dev/null; then
+          echo "AMI $AMI_ID exists. Proceeding with deployment."
+        else
+          echo "AMI $AMI_ID does not exist. Aborting deployment."
+          exit 1
+        fi
+
+    - name: Launch EC2 Instance in Testing Environment
+      run: |
+        INSTANCE_ID=$(aws ec2 run-instances \
+          --image-id ${{ needs.build-and-test.outputs.ami_id }} \
+          --instance-type t2.micro \
+          --security-group-ids sg-01bb736dc58ee3fc4 \
+          --key-name onyeka-github-action-afxtern-pod-a \
+          --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Testing-onyeka}]' \
+          --query 'Instances[0].InstanceId' \
+          --output text)
+        echo "Launched EC2 instance in testing environment with ID: $INSTANCE_ID"
 
     - name: Notify team
       if: always()
@@ -57,40 +145,40 @@ jobs:
           echo "Build and deployment to testing environment failed"
         fi
 
-# workflows for main-branch
-  build-and-deploy:
-    runs-on: ubuntu-latest
+  deploy-to-production:
     needs: build-and-test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
+    - name: Configure AWS CLI
+      uses: aws-actions/configure-aws-credentials@v2
       with:
-        node-version: '18'
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_DEFAULT_REGION }}
 
-    - name: Initialize and Validate Packer template
+    - name: Verify AMI Existence
       run: |
-        packer init aws-ubuntu.pkr.hcl
-        packer validate aws-ubuntu.pkr.hcl
+        AMI_ID=${{ needs.build-and-test.outputs.ami_id }}
+        if aws ec2 describe-images --image-ids $AMI_ID &> /dev/null; then
+          echo "AMI $AMI_ID exists. Proceeding with deployment."
+        else
+          echo "AMI $AMI_ID does not exist. Aborting deployment."
+          exit 1
+        fi
 
-    - name: Build AMI
+    - name: Launch EC2 Instance in Production Environment
       run: |
-        packer build -var 'ami_tag=production-onyeka' aws-ubuntu.pkr.hcl
-    
-    - name: Request approval
-      uses: hmarr/auto-approve-action@v2
-      with:
-        github-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-
-    - name: Deploy to production
-      if: success()
-      run: |
-        # Your deployment script or commands here
-        echo "Deploying to production environment"
+        INSTANCE_ID=$(aws ec2 run-instances \
+          --image-id ${{ needs.build-and-test.outputs.ami_id }} \
+          --instance-type t2.micro \
+          --security-group-ids sg-01bb736dc58ee3fc4 \
+          --key-name onyeka-github-action-afxtern-pod-a \
+          --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Production-onyeka}]' \
+          --query 'Instances[0].InstanceId' \
+          --output text)
+        echo "Launched EC2 instance in production environment with ID: $INSTANCE_ID"
 
     - name: Notify team
       if: always()
@@ -100,31 +188,3 @@ jobs:
         else
           echo "Build and deployment to production environment failed"
         fi
-
-
-
-# jobs:
-#   packer-ami-build:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v2
-
-
-#       - name: Validate the Packer template
-#         uses: wolfangaukang/packer-validate-template@main
-#         with:
-#           run_init: true
-#           args: -var-file templates/var_files/ubuntu.pkrvars.hcl
-#           templates_path: templates/amazon-ebs.pkr.hcl
-        
-#       - name: Packer AMI Build
-#         uses: zmingxie/packer-ami-builder@master
-#         with:
-#           packerVersion: '1.6.4'
-#           packerArgs: 'build .'
-#           workDir: '.'
-#         env:
-#           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#           AWS_DEFAULT_REGION: us-east-1
