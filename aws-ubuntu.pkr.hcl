@@ -12,6 +12,11 @@ variable "ami_prefix" {
   default = "onyi-ubuntu"
 }
 
+variable "ami_tag" {
+  type    = string
+  default = ""
+}
+
 variable "region" {
   type    = string
   default = "us-east-1"
@@ -37,7 +42,7 @@ source "amazon-ebs" "ubuntu" {
   ssh_username = "ubuntu"
   tag {
     key   = "Name"
-    value = var.ami_prefix
+    value = var.ami_tag
   }
 }
 

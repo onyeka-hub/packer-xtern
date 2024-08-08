@@ -1,21 +1,130 @@
-name: Build an AMI using Packer
+name: Github Actions CI/CD pipeline for Building an AMI using Packer
+run-name: ${{ github.actor }} Running Github Actions CI/CD pipeline for Building an AMI using Packer
 
 on:
   push:
     branches:
-      - 'master'
+      - main
+      - feature/*
+  pull_request:
+    branches:
+      - main
+      - feature/*
+
+# AWS credentials and other sensitive information are securely stored using Github Secrets
+env:
+    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
 jobs:
-  packer-ami-build:
+# workflows for feature-branch
+  build-and-test:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v2
-      - name: Packer AMI Build
-        uses: zmingxie/packer-ami-builder@master
-        with:
-          packerVersion: '1.6.4'
-          packerArgs: 'build .'
-          workDir: '.'
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Initialize and Validate Packer template
+      run: |
+        packer init aws-ubuntu.pkr.hcl
+        packer validate aws-ubuntu.pkr.hcl
+
+    - name: Build AMI
+      id: test-ami
+      if: github.ref != 'refs/heads/main'
+      run: |
+        packer build -var 'ami_tag=testing-onyeka' aws-ubuntu.pkr.hcl
+   
+    - name: Deploy to testing environment
+      id: deploy
+      if: github.ref != 'refs/heads/main'
+      run: |
+        # Your deployment script or commands here
+        echo "Deploying to testing environment"
+
+    - name: Notify team
+      if: always()
+      run: |
+        if [ ${{ job.status }} == 'success' ]; then
+          echo "Build and deployment to testing environment succeeded"
+        else
+          echo "Build and deployment to testing environment failed"
+        fi
+
+# workflows for main-branch
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Initialize and Validate Packer template
+      run: |
+        packer init aws-ubuntu.pkr.hcl
+        packer validate aws-ubuntu.pkr.hcl
+
+    - name: Build AMI
+      run: |
+        packer build -var 'ami_tag=production-onyeka' aws-ubuntu.pkr.hcl
+    
+    - name: Request approval
+      uses: hmarr/auto-approve-action@v2
+      with:
+        github-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+    - name: Deploy to production
+      if: success()
+      run: |
+        # Your deployment script or commands here
+        echo "Deploying to production environment"
+
+    - name: Notify team
+      if: always()
+      run: |
+        if [ ${{ job.status }} == 'success' ]; then
+          echo "Build and deployment to production environment succeeded"
+        else
+          echo "Build and deployment to production environment failed"
+        fi
+
+
+
+# jobs:
+#   packer-ami-build:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v2
+
+
+#       - name: Validate the Packer template
+#         uses: wolfangaukang/packer-validate-template@main
+#         with:
+#           run_init: true
+#           args: -var-file templates/var_files/ubuntu.pkrvars.hcl
+#           templates_path: templates/amazon-ebs.pkr.hcl
+        
+#       - name: Packer AMI Build
+#         uses: zmingxie/packer-ami-builder@master
+#         with:
+#           packerVersion: '1.6.4'
+#           packerArgs: 'build .'
+#           workDir: '.'
+#         env:
+#           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           AWS_DEFAULT_REGION: us-east-1
