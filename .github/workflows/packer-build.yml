@@ -168,7 +168,24 @@ jobs:
           exit 1
         fi
 
+    -  name: Manual Approval
+       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+       id: approval
+       uses: trstringer/manual-approval@v1
+       with:
+        approvers: onyeka-hub
+        secret: ${{ secrets.GITHUB_TOKEN }}
+        minimum-approvals: 1
+        issue-title: "Manual approval required for afxtern Terraform pipeline"
+        issue-body: |
+          Workflow is pending manual review.
+          URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          Required approvers: [darey-io, uzukwujp]
+          Respond "approved", "approve", "lgtm", "yes" to continue workflow or "denied", "deny", "no" to cancel.
+
+
     - name: Launch EC2 Instance in Production Environment
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && ${{ steps.approval.outputs.approved }} == 'true'
       run: |
         INSTANCE_ID=$(aws ec2 run-instances \
           --image-id ${{ needs.build-and-test.outputs.ami_id }} \
