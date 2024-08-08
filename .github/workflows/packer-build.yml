@@ -174,7 +174,7 @@ jobs:
        uses: trstringer/manual-approval@v1
        with:
         approvers: onyeka-hub
-        secret: ${{ secrets.GITHUB_TOKEN }}
+        secret: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         minimum-approvals: 1
         issue-title: "Manual approval required for afxtern Terraform pipeline"
         issue-body: |
