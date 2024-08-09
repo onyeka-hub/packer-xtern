@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - feature/*
   pull_request:
     branches:
       - main
@@ -64,17 +63,17 @@ jobs:
 
     - name: Initialize and Validate Packer template
       run: |
-        packer init aws-ubuntu.pkr.hcl
-        packer validate aws-ubuntu.pkr.hcl
+        packer init template.pkr.hcl
+        packer validate template.pkr.hcl
 
     - name: Build AMI
       id: build-ami
       run: |
         LOG_FILE="packer_build.log"
         if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-          packer build -var 'ami_tag=production-onyeka' aws-ubuntu.pkr.hcl | tee $LOG_FILE
+          packer build -var 'ami_tag=ubuntu-production-onyeka' template.pkr.hcl | tee $LOG_FILE
         else
-          packer build -var 'ami_tag=testing-onyeka' aws-ubuntu.pkr.hcl | tee $LOG_FILE
+          packer build -var 'ami_tag=ubuntu-testing-onyeka' template.pkr.hcl | tee $LOG_FILE
         fi
 
     - name: Upload Packer Build Logs
@@ -86,9 +85,9 @@ jobs:
     - name: Extract AMI ID
       id: extract-ami-id
       run: |
-        AMI_TAG="production-onyeka"
+        AMI_TAG="ubuntu-production-onyeka"
         if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
-          AMI_TAG="testing-onyeka"
+          AMI_TAG="ubuntu-testing-onyeka"
         fi
         AMI_ID=$(aws ec2 describe-images --filters "Name=tag:Name,Values=$AMI_TAG" --query "Images[*].[ImageId,CreationDate]" --output text | sort -k2 | tail -n1 | awk '{print $1}')
         
@@ -131,7 +130,7 @@ jobs:
           --instance-type t2.micro \
           --security-group-ids sg-01bb736dc58ee3fc4 \
           --key-name onyeka-github-action-afxtern-pod-a \
-          --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Testing-onyeka}]' \
+          --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=ubuntu-testing-onyeka}]' \
           --query 'Instances[0].InstanceId' \
           --output text)
         echo "Launched EC2 instance in testing environment with ID: $INSTANCE_ID"
@@ -176,11 +175,11 @@ jobs:
         approvers: onyeka-hub
         secret: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         minimum-approvals: 1
-        issue-title: "Manual approval required for afxtern Terraform pipeline"
+        issue-title: "Manual approval required for afxtern packer pipeline"
         issue-body: |
           Workflow is pending manual review.
           URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          Required approvers: [darey-io, uzukwujp]
+          Required approvers: [onyeka]
           Respond "approved", "approve", "lgtm", "yes" to continue workflow or "denied", "deny", "no" to cancel.
 
 
@@ -192,7 +191,7 @@ jobs:
           --instance-type t2.micro \
           --security-group-ids sg-01bb736dc58ee3fc4 \
           --key-name onyeka-github-action-afxtern-pod-a \
-          --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Production-onyeka}]' \
+          --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=ubuntu-production-onyeka}]' \
           --query 'Instances[0].InstanceId' \
           --output text)
         echo "Launched EC2 instance in production environment with ID: $INSTANCE_ID"
