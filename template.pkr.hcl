@@ -15,13 +15,13 @@ variable "aws_region" {
 # variable to select ubuntu AMI
 variable "use_ubuntu" {
   type    = bool
-  default = true
+  default = false
 }
 
 # variable to select redhat AMI
 variable "use_redhat" {
   type    = bool
-  default = false
+  default = true
 }
 
 variable "ami_prefix" {
@@ -107,9 +107,5 @@ build {
         "sudo bash /tmp/security-scripts/002-critical-standards.sh"
       ]
     )
-  }
-
-   provisioner "shell" {
-    inline = ["echo This provisioner runs last"]
   }
 }
