@@ -15,13 +15,13 @@ variable "aws_region" {
 # variable to select ubuntu AMI
 variable "use_ubuntu" {
   type    = bool
-  default = false
+  default = true
 }
 
 # variable to select redhat AMI
 variable "use_redhat" {
   type    = bool
-  default = true
+  default = false
 }
 
 variable "ami_prefix" {

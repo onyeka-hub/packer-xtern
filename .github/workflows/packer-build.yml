@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - feature/*
   pull_request:
     branches:
       - main
@@ -72,9 +71,9 @@ jobs:
       run: |
         LOG_FILE="packer_build.log"
         if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-          packer build -var 'ami_tag=production-onyeka-ubuntu' template.pkr.hcl | tee $LOG_FILE
+          packer build -var 'ami_tag=ubuntu-production-onyeka' template.pkr.hcl | tee $LOG_FILE
         else
-          packer build -var 'ami_tag=testing-onyeka-ubuntu' template.pkr.hcl | tee $LOG_FILE
+          packer build -var 'ami_tag=ubuntu-testing-onyeka' template.pkr.hcl | tee $LOG_FILE
         fi
 
     - name: Upload Packer Build Logs
@@ -86,9 +85,9 @@ jobs:
     - name: Extract AMI ID
       id: extract-ami-id
       run: |
-        AMI_TAG="production-onyeka-ubuntu"
+        AMI_TAG="ubuntu-production-onyeka"
         if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
-          AMI_TAG="testing-onyeka-ubuntu"
+          AMI_TAG="ubuntu-testing-onyeka"
         fi
         AMI_ID=$(aws ec2 describe-images --filters "Name=tag:Name,Values=$AMI_TAG" --query "Images[*].[ImageId,CreationDate]" --output text | sort -k2 | tail -n1 | awk '{print $1}')
         
@@ -131,7 +130,7 @@ jobs:
           --instance-type t2.micro \
           --security-group-ids sg-01bb736dc58ee3fc4 \
           --key-name onyeka-github-action-afxtern-pod-a \
-          --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Testing-onyeka}]' \
+          --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=ubuntu-testing-onyeka}]' \
           --query 'Instances[0].InstanceId' \
           --output text)
         echo "Launched EC2 instance in testing environment with ID: $INSTANCE_ID"
@@ -192,7 +191,7 @@ jobs:
           --instance-type t2.micro \
           --security-group-ids sg-01bb736dc58ee3fc4 \
           --key-name onyeka-github-action-afxtern-pod-a \
-          --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Production-onyeka}]' \
+          --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=ubuntu-production-onyeka}]' \
           --query 'Instances[0].InstanceId' \
           --output text)
         echo "Launched EC2 instance in production environment with ID: $INSTANCE_ID"
