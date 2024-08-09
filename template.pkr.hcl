@@ -7,7 +7,7 @@ packer {
   }
 }
 
-variable "region" {
+variable "aws_region" {
   type    = string
   default = "us-east-1"
 }
@@ -31,7 +31,7 @@ variable "ami_prefix" {
 
 variable "ami_tag" {
   type    = string
-  default = ""
+  default = "default_ami"
 }
 locals {
   timestamp = regex_replace(timestamp(), "[- TZ:]", "")
