@@ -128,7 +128,7 @@ jobs:
         INSTANCE_ID=$(aws ec2 run-instances \
           --image-id ${{ needs.build-and-test.outputs.ami_id }} \
           --instance-type t2.micro \
-          --security-group-ids sg-01bb736dc58ee3fc4 \
+          --security-group-ids sg-0efb8b8b53f38dd2b \
           --key-name onyeka-github-action-afxtern-pod-a \
           --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=ubuntu-testing-onyeka}]' \
           --query 'Instances[0].InstanceId' \
