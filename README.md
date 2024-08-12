@@ -117,3 +117,44 @@ This line of code is part of a Packer configuration script, specifically within 
 ### Summary:
 
 This provisioner dynamically adjusts the commands it runs based on the operating system being used, ensuring that the appropriate package manager is updated (`apt` for Ubuntu and `yum` for Red Hat) and then running common security hardening scripts.
+
+## Maintaining the CHANGELOG
+The CHANGELOG.md file is an essential document that tracks all notable changes made to the project. It helps team members and users understand what has been added, changed, fixed, or removed in each release.
+
+### How to Update the CHANGELOG
+
+1. Before Merging Pull Requests:
+
+- Ensure that the CHANGELOG.md is updated to reflect any relevant changes introduced by your pull request.
+- Add new entries under the [Unreleased] section, including the date when the change was made.
+
+2. Sections to Update:
+
+- Added: For new features or functionalities.
+- Changed: For changes in existing features or functionalities.
+- Deprecated: For features or functionalities that are no longer recommended for use.
+- Removed: For features or functionalities that have been removed from the project.
+- Fixed: For any bugs or issues that have been resolved.
+- Security: For security-related improvements or fixes.
+
+3. Format:
+
+- Use bullet points for each item.
+- Be concise but informative; describe what was done and why if necessary.
+
+4. Example:
+
+- Added: Implemented a new feature to automate AMI builds using Packer.
+- Fixed: Resolved an issue where SSH configuration did not correctly disable root login.
+
+5. Versioning:
+
+- Once the changes are released, move the [Unreleased] section to a new versioned section, e.g., [1.0.0] - YYYY-MM-DD, and start a new [Unreleased] section.
+
+## Slack Notification
+
+[slack github action](https://github.com/marketplace/actions/slack-send)
+
+[create a slack app](https://api.slack.com/apps)
+
+[slack incoming webhooks](https://api.slack.com/scopes/incoming-webhook)
