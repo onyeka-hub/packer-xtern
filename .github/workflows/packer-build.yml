@@ -129,7 +129,7 @@ jobs:
           --image-id ${{ needs.build-and-test.outputs.ami_id }} \
           --instance-type t2.micro \
           --security-group-ids sg-0efb8b8b53f38dd2b \
-          --key-name onyeka-github-action-afxtern-pod- \
+          --key-name onyeka-github-action-afxtern-pod-a \
           --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=ubuntu-testing-onyeka}]' \
           --query 'Instances[0].InstanceId' \
           --output text)
@@ -152,7 +152,7 @@ jobs:
       # For posting a rich message using Block Kit
         payload: |
           {
-            "text": ":x: Workflow failed for *${{ github.repository }}* on branch *${{ github.ref_name }}* at commit `${{ github.sha }}`.\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View details>",
+            "text": ":x: Packer Pipeline failed for *${{ github.repository }}* on branch *${{ github.ref_name }}* at commit `${{ github.sha }}`.\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View details>",
             "channel": "af-xtern-pod-a-ci-cd",
             "username": "GitHub Actions"
           }
@@ -229,7 +229,7 @@ jobs:
         # For posting a rich message using Block Kit
         payload: |
           {
-            "text": ":x: Workflow failed for *${{ github.repository }}* on branch *${{ github.ref_name }}* at commit `${{ github.sha }}`.\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View details>",
+            "text": ":x: Packer Pipeline failed for *${{ github.repository }}* on branch *${{ github.ref_name }}* at commit `${{ github.sha }}`.\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View details>",
             "channel": "af-xtern-pod-a-ci-cd",
             "username": "GitHub Actions"
           }
