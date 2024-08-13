@@ -144,6 +144,22 @@ jobs:
           echo "Build and deployment to testing environment failed"
         fi
 
+    - name: Slack Notifications for GitHub Actions
+      if: failure()
+      id: slack
+      uses: slackapi/slack-github-action@v1.26.0
+      with:
+      # For posting a rich message using Block Kit
+        payload: |
+          {
+            "text": ":x: Packer Pipeline failed for *${{ github.repository }}* on branch *${{ github.ref_name }}* at commit `${{ github.sha }}`.\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View details>",
+            "channel": "af-xtern-pod-a-ci-cd",
+            "username": "GitHub Actions"
+          }
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
   deploy-to-production:
     needs: build-and-test
     runs-on: ubuntu-latest
@@ -190,7 +206,7 @@ jobs:
           --image-id ${{ needs.build-and-test.outputs.ami_id }} \
           --instance-type t2.micro \
           --security-group-ids sg-01bb736dc58ee3fc4 \
-          --key-name onyeka-github-action-afxtern-pod- \
+          --key-name onyeka-github-action-afxtern-pod-a \
           --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=ubuntu-production-onyeka}]' \
           --query 'Instances[0].InstanceId' \
           --output text)
@@ -205,29 +221,6 @@ jobs:
           echo "Build and deployment to production environment failed"
         fi
 
-    # - name: Slack Notifications for GitHub Actions
-    #   if: failure()
-    #   id: slack
-    #   uses: slackapi/slack-github-action@v1.26.0
-    #   with:
-    #     # For posting a rich message using Block Kit
-    #     payload: |
-    #       {
-    #         "text": "GitHub Action build result: ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}",
-    #         "blocks": [
-    #           {
-    #             "type": "section",
-    #             "text": {
-    #               "type": "mrkdwn",
-    #               "text": "GitHub Action build result: ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
-    #             }
-    #           }
-    #         ]
-    #       }
-    #   env:
-    #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-    #     SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
-
     - name: Slack Notifications for GitHub Actions
       if: failure()
       id: slack
@@ -236,7 +229,7 @@ jobs:
         # For posting a rich message using Block Kit
         payload: |
           {
-            "text": ":x: Workflow failed for *${{ github.repository }}* on branch *${{ github.ref_name }}* at commit `${{ github.sha }}`.\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View details>"
+            "text": ":x: Packer Pipeline failed for *${{ github.repository }}* on branch *${{ github.ref_name }}* at commit `${{ github.sha }}`.\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View details>",
             "channel": "af-xtern-pod-a-ci-cd",
             "username": "GitHub Actions"
           }
