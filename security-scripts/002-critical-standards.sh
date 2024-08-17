@@ -1,8 +1,12 @@
 #!/bin/bash
 
-sleep 15
 echo "###################### Executing 002-critical-standards.sh ##########################"
+echo 'Hello, Packer!'
 
+set -e
+
+# Enable debugging
+set -x
 
 # Log file location
 log_file="/var/log/time_sync_setup.log"
@@ -21,28 +25,46 @@ configure_time_sync() {
     log "Debian-based system detected."
     pkg_mgr="apt-get"
     install_cmd="apt-get install -y chrony"
+
+      # Install chrony
+      if $install_cmd; then
+        log "chrony installed successfully."
+      else
+        log "Error installing chrony."
+        return 1
+      fi
+
+      # Enable and start chrony service
+      if systemctl enable chrony && systemctl start chrony; then
+        log "chrony service enabled and started successfully."
+      else
+        log "Error enabling or starting chrony service."
+        return 1
+      fi
+
   elif [ -f /etc/redhat-release ]; then
     log "RedHat-based system detected."
     pkg_mgr="yum"
     install_cmd="yum install -y chrony"
+
+      # Install chrony
+      if $install_cmd; then
+        log "chrony installed successfully."
+      else
+        log "Error installing chrony."
+        return 1
+      fi
+
+       # Enable and start chrony service
+      if systemctl enable chronyd && systemctl start chronyd; then
+        log "chrony service enabled and started successfully."
+      else
+        log "Error enabling or starting chrony service."
+        return 1
+      fi
+
   else
     log "Unsupported system type."
-    return 1
-  fi
-
-  # Install chrony
-  if $install_cmd; then
-    log "chrony installed successfully."
-  else
-    log "Error installing chrony."
-    return 1
-  fi
-
-  # Enable and start chrony service
-  if systemctl enable chrony && systemctl start chrony; then
-    log "chrony service enabled and started successfully."
-  else
-    log "Error enabling or starting chrony service."
     return 1
   fi
 
